@@ -23,8 +23,6 @@ object SentimentAnalysisInference extends App {
   val conf = ConfigFactory.load()
 
   val spark = SparkSession.builder.master("local[*]").getOrCreate
-  spark.sparkContext.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", conf.getString("aws.s3.accessKey"))
-  spark.sparkContext.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", conf.getString("aws.s3.secretAccessKey"))
 
   val model = SageMakerModel.fromEndpoint(
     endpointName = conf.getString("aws.sageMaker.endpoint"),
@@ -32,7 +30,7 @@ object SentimentAnalysisInference extends App {
     responseRowDeserializer = new LinearLearnerBinaryClassifierProtobufResponseRowDeserializer()
   )
 
-  val reviewData = spark.createDataFrame(Seq((1.0, review))).toDF("label", "review")
+  val reviewData = spark.createDataFrame(Seq(Tuple1(review))).toDF("review")
 
   val tokenizer = new Tokenizer().setInputCol("review").setOutputCol("words")
   val wordsData = tokenizer.transform(reviewData)
@@ -40,5 +38,5 @@ object SentimentAnalysisInference extends App {
   val testData = hashingTF.transform(wordsData)
 
   val prediction = model.transform(testData)
-  prediction.show
+  prediction.selectExpr("review", "score", "predicted_label prediction").show
 }
